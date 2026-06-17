@@ -1,0 +1,674 @@
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>غرفة العمليات المركزية - بيت حانون</title>
+    
+    <!-- وسوم تطبيق الويب التقدمي المخصص للجوال PWA -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0f172a">
+    <link rel="manifest" href="manifest.json">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+
+    <style>
+        body { 
+            font-family: 'Cairo', sans-serif; 
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #0f172a; 
+            -webkit-tap-highlight-color: transparent;
+            min-h-screen: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+        }
+
+        /* حاكي وتصميم هيكل الموبايل للكمبيوتر */
+        @media (min-width: 640px) {
+            .phone-wrapper {
+                width: 410px;
+                height: 840px;
+                background: #000;
+                border: 12px solid #334155;
+                border-radius: 45px;
+                box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+                position: relative;
+                overflow: hidden;
+            }
+            /* النوتش العلوي للجوال */
+            .phone-notch {
+                position: absolute;
+                top: 0;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 140px;
+                height: 25px;
+                background: #334155;
+                border-bottom-left-radius: 18px;
+                border-bottom-right-radius: 18px;
+                z-index: 100;
+            }
+            .phone-screen {
+                width: 100%;
+                height: 100%;
+                background: #f8fafc;
+                overflow-y: auto;
+                position: relative;
+                padding-top: 25px;
+            }
+        }
+
+        /* إلغاء الهيكل الخارجي عند فتح الرابط من الجوال مباشرة ليأخذ الشاشة كاملة */
+        @media (max-width: 639px) {
+            .phone-wrapper {
+                width: 100vw;
+                height: 100vh;
+                border: none;
+                border-radius: 0;
+                box-shadow: none;
+            }
+            .phone-notch { display: none; }
+            .phone-screen {
+                width: 100%;
+                height: 100%;
+                background: #f8fafc;
+                overflow-y: auto;
+            }
+        }
+
+        .mobile-nav-active { color: #10b981 !important; font-weight: 700; }
+        .phone-screen::-webkit-scrollbar { width: 0px; }
+    </style>
+</head>
+<body>
+
+    <script>
+        // 🚨 ضع هنا رابط الـ Web App المولد من الـ Google Apps Script بعد عمل Deploy 🚨
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyQuJwMCciQfGStuOIbGN2jWAAeIEtTqYe5BEWzZmBJB_-gxoDRI_EwfYTDHBpX9Q/exec"; 
+        
+        let currentSheetName = "families"; 
+        let allSystemData = {};            
+        let currentUser = null;            
+        let activeEditId = null;           
+    </script>
+
+    <!-- الهيكل المحاكي للموبايل -->
+    <div class="phone-wrapper">
+        <div class="phone-notch"></div>
+        
+        <div class="phone-screen flex flex-col justify-between">
+            
+            <!-- 1. شاشة تسجيل الدخول داخل الموبايل -->
+            <div id="login-screen" class="flex flex-col items-center justify-center h-full px-6 bg-slate-900 text-center animate__animated animate__fadeIn">
+                <i class="fa-solid fa-city text-5xl text-emerald-500 mb-4 animate__animated animate__bounceIn"></i>
+                <h2 class="text-xl font-bold text-white mb-1">غرفة العمليات المركزية</h2>
+                <p class="text-slate-400 mb-8 text-xs">منظومة بيت حانون لإدارة شؤون النازحين</p>
+                
+                <form id="login-form" onsubmit="handleLogin(event)" class="w-full max-w-sm">
+                    <div class="mb-4 text-right">
+                        <label class="block text-slate-300 font-bold mb-1.5 text-xs"><i class="fa-solid fa-user ml-1 text-slate-500"></i> اسم المستخدم</label>
+                        <input type="text" id="username" placeholder="اسم المستخدم المعتمد" class="w-full px-4 py-3 bg-slate-800 border border-slate-700 text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-right transition text-sm" required>
+                    </div>
+                    <div class="mb-6 text-right">
+                        <label class="block text-slate-300 font-bold mb-1.5 text-xs"><i class="fa-solid fa-lock ml-1 text-slate-500"></i> كلمة المرور</label>
+                        <input type="password" id="password" placeholder="••••••••" class="w-full px-4 py-3 bg-slate-800 border border-slate-700 text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-left transition text-sm" required>
+                    </div>
+                    <button type="submit" id="login-submit-btn" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-xl transition shadow-lg shadow-emerald-600/20 active:scale-95">
+                        <span id="login-btn-text"><i class="fa-solid fa-right-to-bracket ml-2"></i> دخول آمن للمنظومة</span>
+                    </button>
+                </form>
+            </div>
+
+            <!-- 2. لوحة التحكم الرئيسية داخل الموبايل -->
+            <div id="dashboard-screen" class="hidden flex-1 flex flex-col justify-between h-full pb-[65px]">
+                
+                <!-- هيدر التطبيق العلوي الثابت -->
+                <header class="bg-slate-950 text-white px-4 py-3 shadow-md flex items-center justify-between sticky top-0 z-40">
+                    <div class="flex items-center gap-2">
+                        <div class="bg-emerald-500 p-2 rounded-lg text-slate-950 text-xs">
+                            <i class="fa-solid fa-shield-halved"></i>
+                        </div>
+                        <div class="text-right">
+                            <h1 id="current-title" class="text-xs font-bold truncate max-w-[170px]">بيانات الأسر والنازحين</h1>
+                            <p id="user-display-name" class="text-[9px] text-emerald-400 font-medium truncate">جاري الاتصال...</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center gap-1">
+                        <button onclick="fetchAllData()" class="w-8 h-8 bg-slate-800 rounded-lg flex items-center justify-center text-emerald-400 active:bg-slate-700 transition">
+                            <i class="fa-solid fa-arrows-rotate text-xs"></i>
+                        </button>
+                        <button onclick="logout()" class="w-8 h-8 bg-rose-600/20 rounded-lg flex items-center justify-center text-rose-400 active:bg-rose-600 active:text-white transition">
+                            <i class="fa-solid fa-power-off text-xs"></i>
+                        </button>
+                    </div>
+                </header>
+
+                <!-- مساحة استعراض الكروت والبيانات القابلة للتمرير -->
+                <main class="flex-1 p-3 overflow-y-auto">
+                    <div class="grid grid-cols-2 gap-2 mb-3">
+                        <button onclick="openAddModal()" class="bg-emerald-600 text-white font-bold py-2.5 px-2 rounded-xl shadow transition flex items-center justify-center gap-1.5 text-[11px] active:scale-95">
+                            <i class="fa-solid fa-square-plus text-sm"></i> إضافة سجل
+                        </button>
+                        <button onclick="toggleExportMenu()" class="bg-blue-600 text-white font-bold py-2.5 px-2 rounded-xl shadow transition flex items-center justify-center gap-1.5 text-[11px] active:scale-95">
+                            <i class="fa-solid fa-file-arrow-down text-sm"></i> تصدير الكشف
+                        </button>
+                    </div>
+
+                    <!-- منيو التصدير السريع للموبايل -->
+                    <div id="export-dropdown" class="hidden bg-white rounded-xl shadow border border-slate-200 mb-3 p-1 grid grid-cols-2 gap-1 animate__animated animate__fadeIn">
+                        <button onclick="exportCurrentTable('excel')" class="text-right px-2 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-1 border rounded-lg"><i class="fa-solid fa-file-excel text-emerald-600"></i> إكسل Excel</button>
+                        <button onclick="exportCurrentTable('pdf')" class="text-right px-2 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-1 border rounded-lg"><i class="fa-solid fa-file-pdf text-rose-500"></i> تقرير PDF</button>
+                        <button onclick="downloadAllSheetsInOne()" class="col-span-2 text-center justify-center px-2 py-1.5 text-[11px] font-bold text-indigo-600 bg-indigo-50 flex items-center gap-1 rounded-lg"><i class="fa-solid fa-cloud-arrow-down"></i> تحميل التقرير الموحد الشامل</button>
+                    </div>
+
+                    <!-- حاوية كروت السجلات الميدانية المرنة للنازحين -->
+                    <div id="mobile-cards-container" class="space-y-2.5">
+                        <div class="text-center py-12 text-slate-400 bg-white rounded-xl border border-slate-200 shadow-sm">
+                            <i class="fa-solid fa-spinner fa-spin text-xl text-emerald-600 mb-2 block mx-auto"></i>
+                            <p class="text-[11px] font-medium">جاري استدعاء السجلات ومزامنة اللوحة الرقمية...</p>
+                        </div>
+                    </div>
+                </main>
+
+                <!-- البار السفلي المدمج للتنقل السريع بلمسة الإبهام (Bottom Tab Bar) -->
+                <nav class="absolute bottom-0 left-0 right-0 bg-slate-950 border-t border-slate-800 shadow-2xl z-50 flex justify-around items-center py-2 h-[60px]">
+                    <button onclick="switchTab('families')" class="tab-btn flex flex-col items-center gap-1 text-slate-400 transition mobile-nav-active">
+                        <i class="fa-solid fa-people-roof text-base"></i>
+                        <span class="text-[8.5px]">الأسر</span>
+                    </button>
+                    <button onclick="switchTab('children')" class="tab-btn flex flex-col items-center gap-1 text-slate-400 transition">
+                        <i class="fa-solid fa-child text-base"></i>
+                        <span class="text-[8.5px]">الأطفال</span>
+                    </button>
+                    <button onclick="switchTab('students')" class="tab-btn flex flex-col items-center gap-1 text-slate-400 transition">
+                        <i class="fa-solid fa-graduation-cap text-base"></i>
+                        <span class="text-[8.5px]">الطلاب</span>
+                    </button>
+                    <button onclick="switchTab('certificates')" class="tab-btn flex flex-col items-center gap-1 text-slate-400 transition">
+                        <i class="fa-solid fa-file-invoice text-base"></i>
+                        <span class="text-[8.5px]">الشهادات</span>
+                    </button>
+                    <button onclick="switchTab('injured')" class="tab-btn flex flex-col items-center gap-1 text-slate-400 transition">
+                        <i class="fa-solid fa-user-injured text-base"></i>
+                        <span class="text-[8.5px]">الجرحى</span>
+                    </button>
+                    <button id="nav-admins-tab" onclick="switchTab('admins')" class="tab-btn flex flex-col items-center gap-1 text-slate-400 transition">
+                        <i class="fa-solid fa-users-gear text-base"></i>
+                        <span class="text-[8.5px]">اللجان</span>
+                    </button>
+                </nav>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- مودال الاستمارة منبثق من الأسفل (Bottom Sheet Style) متوافق مع اللمس -->
+    <div id="data-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-end justify-center z-[60] p-0 animate__animated animate__fadeIn animate__faster">
+        <div class="bg-white rounded-t-3xl shadow-2xl w-full max-w-md p-4 max-h-[80vh] flex flex-col border border-slate-100 animate__animated animate__slideInUp animate__faster">
+            <div class="flex items-center justify-between border-b pb-2.5 mb-2.5">
+                <div class="text-right">
+                    <h3 id="modal-title" class="text-xs font-bold text-slate-900">إضافة سجل جديد</h3>
+                    <p class="text-[9.5px] text-rose-500 font-semibold mt-0.5">الحقول الأساسية إلزامية لتوثيق البصمة والاسم السحابي.</p>
+                </div>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 p-2"><i class="fa-solid fa-xmark text-base"></i></button>
+            </div>
+
+            <form id="modal-form" onsubmit="saveRecord(event)" class="overflow-y-auto px-1 flex-1 space-y-3">
+                <div id="modal-inputs-container" class="space-y-2.5 text-right"></div>
+
+                <!-- التعهد الرقمي مصغر بالكامل للموبايل -->
+                <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-right text-[11px]">
+                    <h4 class="text-amber-800 font-bold mb-1 flex items-center gap-1.5 text-[11px]">
+                        <i class="fa-solid fa-signature"></i> التعهد والإقرار القانوني للمنظومة
+                    </h4>
+                    <p class="text-amber-900 text-[10px] leading-relaxed mb-2">
+                        أقر بصفتي الرسمية بأن البيانات صحيحة تماماً وتطابق الفحص الفعلي للجنة بـ (<span id="declaration-sheet-name" class="font-bold text-emerald-700"></span>).
+                    </p>
+                    <div class="bg-white p-2 rounded-lg border border-amber-100 text-[9.5px] grid grid-cols-2 gap-1 mb-2">
+                        <div><span class="text-slate-500">منظم السجل:</span> <span id="declaration-user-name" class="font-bold text-emerald-700"></span></div>
+                        <div><span class="text-slate-500">معرف المسؤول:</span> <span id="declaration-user-id" class="font-bold text-emerald-700"></span></div>
+                    </div>
+                    <div class="flex items-start gap-1.5">
+                        <input type="checkbox" id="declaration-checkbox" class="w-3.5 h-3.5 mt-0.5 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500" required>
+                        <label for="declaration-checkbox" class="text-[9.5px] font-bold text-amber-950 select-none">أوافق وبصمتي مسجلة بالكشف اللحظي.</label>
+                    </div>
+                </div>
+
+                <div class="flex gap-2 pt-2.5 border-t sticky bottom-0 bg-white pb-2">
+                    <button type="submit" id="save-submit-btn" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl shadow text-xs transition flex items-center justify-center gap-1.5 active:scale-95">
+                        <i class="fa-solid fa-cloud-arrow-up"></i> حفظ ومزامنة السجل
+                    </button>
+                    <button type="button" onclick="closeModal()" class="bg-slate-100 text-slate-600 py-3 px-4 rounded-xl text-xs font-semibold">إلغاء</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- نافذة التنبيهات المنبثقة الدائرية للموبايل -->
+    <div id="custom-alert" class="hidden fixed inset-0 flex items-center justify-center p-6 z-[100] bg-black/60 backdrop-blur-xs animate__animated animate__fadeIn animate__faster">
+        <div id="alert-card" class="bg-white p-5 rounded-2xl max-w-xs w-full text-center shadow-2xl border border-slate-100 animate__animated animate__zoomIn animate__faster">
+            <div id="alert-icon-box" class="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 text-xl"></div>
+            <h4 id="alert-title" class="text-sm font-bold text-slate-900 mb-1"></h4>
+            <p id="alert-message" class="text-[11px] text-slate-500 mb-4 leading-relaxed"></p>
+            <button onclick="closeCustomAlert()" class="w-full bg-slate-900 text-white font-bold py-2 rounded-xl text-xs transition active:scale-95">فهمت</button>
+        </div>
+    </div>
+
+    <script>
+        function showCustomAlert(title, message, type = 'success') {
+            const alertBox = document.getElementById('custom-alert');
+            const iconBox = document.getElementById('alert-icon-box');
+            document.getElementById('alert-title').innerText = title;
+            document.getElementById('alert-message').innerText = message;
+
+            if (type === 'success') {
+                iconBox.className = "w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 text-xl bg-emerald-100 text-emerald-600";
+                iconBox.innerHTML = '<i class="fa-solid fa-circle-check"></i>';
+            } else if (type === 'warning') {
+                iconBox.className = "w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 text-xl bg-amber-100 text-amber-600";
+                iconBox.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i>';
+            } else {
+                iconBox.className = "w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 text-xl bg-rose-100 text-rose-600";
+                iconBox.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
+            }
+            alertBox.classList.remove('hidden');
+        }
+
+        function closeCustomAlert() { document.getElementById('custom-alert').classList.add('hidden'); }
+        function toggleExportMenu() { document.getElementById('export-dropdown').classList.toggle('hidden'); }
+
+        function handleLogin(e) {
+            e.preventDefault();
+            const user = document.getElementById('username').value.trim();
+            const pass = document.getElementById('password').value.trim();
+            const submitBtn = document.getElementById('login-submit-btn');
+
+            submitBtn.disabled = true;
+            document.getElementById('login-btn-text').innerHTML = '<i class="fa-solid fa-spinner fa-spin ml-1"></i> جاري المصادقة...';
+
+            fetch(SCRIPT_URL, {
+                method: 'POST',
+                body: JSON.stringify({ action: 'login', username: user, password: pass })
+            })
+            .then(res => res.json())
+            .then(res => {
+                submitBtn.disabled = false;
+                document.getElementById('login-btn-text').innerHTML = '<i class="fa-solid fa-right-to-bracket ml-2"></i> دخول آمن للمنظومة';
+                if (res.status === 'success') {
+                    currentUser = res.user;
+                    localStorage.setItem('active_hanoun_user', JSON.stringify(currentUser));
+                    initDashboard();
+                } else {
+                    showCustomAlert("فشل الدخول ❌", res.message, "error");
+                }
+            })
+            .catch(() => {
+                submitBtn.disabled = false;
+                document.getElementById('login-btn-text').innerHTML = '<i class="fa-solid fa-right-to-bracket ml-2"></i> دخول آمن للمنظومة';
+                showCustomAlert("خطأ في الاتصال بالسحابة 🌐", "تأكد من تركيب رابط السكربت وتفعيله بشكل صحيح.", "error");
+            });
+        }
+
+        function initDashboard() {
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('dashboard-screen').classList.remove('hidden');
+            document.getElementById('user-display-name').innerText = `المشرف: ${currentUser.name} (${currentUser.role})`;
+            fetchAllData();
+        }
+
+        function fetchAllData() {
+            const container = document.getElementById('mobile-cards-container');
+            container.innerHTML = `<div class="text-center py-12 text-slate-400 bg-white rounded-xl border border-slate-200 shadow-sm"><i class="fa-solid fa-spinner fa-spin text-xl text-emerald-600 mb-2 block mx-auto"></i><p class="text-[11px] font-medium">جاري استخراج السجلات اللحظية...</p></div>`;
+            
+            fetch(`${SCRIPT_URL}?action=adminFetchAll`)
+            .then(res => res.json())
+            .then(res => {
+                if (res.status === 'success') {
+                    allSystemData = res;
+                    renderMobileCards();
+                } else {
+                    showCustomAlert("خطأ في جلب البيانات ❌", res.message, "error");
+                }
+            })
+            .catch(() => {
+                container.innerHTML = `<div class="text-center py-8 text-rose-500 font-bold bg-white rounded-xl border border-slate-200 shadow-sm text-xs"><i class="fa-solid fa-wifi mb-2 block text-lg"></i> فشل الاتصال بقاعدة البيانات.</div>`;
+            });
+        }
+
+        function renderMobileCards() {
+            const sheetData = allSystemData[currentSheetName] || [];
+            const container = document.getElementById('mobile-cards-container');
+            container.innerHTML = "";
+
+            if (sheetData.length === 0 || sheetData.length === 1) {
+                container.innerHTML = `<div class="text-center py-10 text-amber-600 font-bold bg-white rounded-xl border border-slate-200 shadow-sm text-[11px]"><i class="fa-solid fa-triangle-exclamation mb-2 block text-lg"></i> لا توجد سجلات في [${currentSheetName}].</div>`;
+                return;
+            }
+
+            const headers = sheetData[0];
+
+            for (let i = 1; i < sheetData.length; i++) {
+                const rowObj = {};
+                headers.forEach((h, idx) => rowObj[h] = sheetData[i][idx]);
+                const autoId = sheetData[i][0];
+                const nameValue = sheetData[i][2] || sheetData[i][1] || "سجل غير مسمى";
+
+                let cardHtml = `<div class="bg-white rounded-xl p-3.5 border border-slate-200 shadow-sm space-y-2 text-right">`;
+                cardHtml += `<div class="flex justify-between items-center border-b pb-1.5">
+                                <span class="font-bold text-slate-900 text-xs"><i class="fa-solid fa-user-tag text-emerald-600 ml-1"></i> ${nameValue}</span>
+                                <span class="text-[9px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-bold"># ${autoId}</span>
+                             </div><div class="grid grid-cols-1 gap-1 text-[11px]">`;
+                
+                headers.forEach((h, idx) => {
+                    if (idx > 0 && h !== "الإقرار القانوني" && h !== "منظم السجل" && h !== "هوية المسؤول") {
+                        cardHtml += `<div class="flex justify-between border-b border-dashed border-slate-100 pb-0.5">
+                                        <span class="text-slate-500">${h}:</span>
+                                        <span class="font-semibold text-slate-800">${sheetData[i][idx] || '---'}</span>
+                                     </div>`;
+                    }
+                });
+                cardHtml += `</div><div class="flex justify-end gap-1.5 pt-1.5 border-t mt-1.5">`;
+                
+                if (currentUser && currentUser.role === "موظف" && currentSheetName === "admins") {
+                    cardHtml += `<span class="text-[10px] text-slate-400 font-bold italic"><i class="fa-solid fa-lock ml-1"></i> صلاحيات مقيدة</span>`;
+                } else {
+                    cardHtml += `<button onclick='openEditModal(${JSON.stringify(rowObj)})' class="text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-1 text-[10px] font-bold flex items-center gap-1 active:scale-95"><i class="fa-solid fa-pen-to-square"></i> تعديل</button>
+                                 <button onclick="deleteRecord('${autoId}')" class="text-rose-600 bg-rose-50 border border-rose-100 rounded-lg px-2.5 py-1 text-[10px] font-bold flex items-center gap-1 active:scale-95"><i class="fa-solid fa-trash"></i> حذف</button>`;
+                }
+                cardHtml += `</div></div>`;
+                container.innerHTML += cardHtml;
+            }
+        }
+
+        function switchTab(sheetName) {
+            currentSheetName = sheetName;
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('mobile-nav-active'));
+            event.currentTarget.classList.add('mobile-nav-active');
+            
+            const titles = {
+                families: "بيانات الأسر والنازحين الرئيسية",
+                children: "سجلات ومتابعة الأطفال والرضع",
+                students: "شؤون طلبة الجامعات والأكاديميين",
+                certificates: "الشهادات الأكاديمية المعلقة",
+                injured: "كشوفات المصابين والجرحى والرعاية",
+                admins: "حسابات المشرفين واللجان الميدانية"
+            };
+            document.getElementById('current-title').innerText = titles[sheetName];
+            renderMobileCards();
+        }
+
+        function openAddModal() {
+            if (currentUser && currentUser.role === "موظف" && currentSheetName === "admins") {
+                showCustomAlert("صلاحية مقيدة ⚠️", "لا يمتلك الموظف الميداني صلاحية إدارة المشرفين.", "warning");
+                return;
+            }
+            activeEditId = null;
+            document.getElementById('modal-title').innerText = "إضافة سجل جديد للسحابة";
+            document.getElementById('declaration-checkbox').checked = false;
+            buildModalFields({});
+            setupDeclarationUI();
+            document.getElementById('data-modal').classList.remove('hidden');
+        }
+
+        function openEditModal(rowObj) {
+            if (currentUser && currentUser.role === "موظف" && currentSheetName === "admins") {
+                showCustomAlert("صلاحية مقيدة ⚠️", "لا يمكن للموظف الميداني التعديل على المشرفين.", "warning");
+                return;
+            }
+            activeEditId = rowObj[allSystemData[currentSheetName][0][0]]; 
+            document.getElementById('modal-title').innerText = "تعديل وحفظ السجل الحالي";
+            document.getElementById('declaration-checkbox').checked = false;
+            buildModalFields(rowObj);
+            setupDeclarationUI();
+            document.getElementById('data-modal').classList.remove('hidden');
+        }
+
+        function buildModalFields(dataObj) {
+            const container = document.getElementById('modal-inputs-container');
+            container.innerHTML = "";
+            const headers = allSystemData[currentSheetName][0];
+            const isManager = (currentUser && (currentUser.role === 'مدير' || currentUser.role === 'مشرف'));
+
+            headers.forEach((h, idx) => {
+                let isReadOnly = "";
+                if (!isManager && idx === 0 && (h.includes("تلقائي") || h.includes("الرقم"))) {
+                    isReadOnly = "readonly bg-slate-100 text-slate-400 font-bold";
+                }
+
+                const val = dataObj[h] !== undefined ? dataObj[h] : "";
+                const type = h.includes("تاريخ") ? "date" : "text";
+
+                const optionalFields = ["الحالة الصحية", "الحالة الاجتماعية", "رب الاسرة على قيد الحياة", "الاحتياجات الحالية والملحة", "ملاحظات إضافية", "ملاحظات"];
+                const isOptional = optionalFields.some(field => h.includes(field));
+                const star = isOptional ? `<span class="text-slate-400 text-[9px]"> (اختياري)</span>` : `<span class="text-rose-500">*</span>`;
+
+                let autoCalcAttr = "";
+                if (h.includes("العمر")) {
+                    isReadOnly = "readonly bg-emerald-50 text-emerald-700 font-bold";
+                    autoCalcAttr = 'id="auto-calc-age"';
+                }
+                if (h.includes("عدد الاطفال") || h.includes("عدد الطلاب") || h.includes("الشهادات المعلقة") || h.includes("عدد المصابين") || h.includes("عدد الافراد")) {
+                    isReadOnly = "readonly bg-blue-50 text-blue-700 font-bold";
+                }
+
+                let onChangeEvent = "";
+                if (h.includes("تاريخ الميلاد")) {
+                    onChangeEvent = `onchange="calculateLiveAge(this.value)"`;
+                }
+
+                container.innerHTML += `<div>
+                    <label class="block text-[11px] font-bold text-slate-700 mb-0.5">${h} ${star}</label>
+                    <input type="${type}" ${autoCalcAttr} ${onChangeEvent} name="${h}" data-label="${h}" data-optional="${isOptional}" value="${val}" ${isReadOnly} class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition text-xs field-input">
+                </div>`;
+            });
+        }
+
+        function calculateLiveAge(birthDateString) {
+            const ageInput = document.getElementById('auto-calc-age');
+            if (!ageInput || !birthDateString) return;
+            const birthDate = new Date(birthDateString);
+            const today = new Date();
+            let age = today.getFullYear() - birthDate.getFullYear();
+            const m = today.getMonth() - birthDate.getMonth();
+            if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
+            ageInput.value = age >= 0 ? age : 0;
+        }
+
+        function setupDeclarationUI() {
+            document.getElementById('declaration-sheet-name').innerText = currentSheetName;
+            document.getElementById('declaration-user-name').innerText = currentUser ? currentUser.name : 'مشرف ميداني';
+            document.getElementById('declaration-user-id').innerText = currentUser ? `${currentUser.username}` : '000000000';
+        }
+
+        function saveRecord(event) {
+            event.preventDefault();
+            const inputs = document.querySelectorAll('.field-input');
+            let allFilled = true;
+            let firstEmptyInput = null;
+
+            inputs.forEach(input => {
+                if (input.hasAttribute('readonly') || input.getAttribute('data-optional') === "true") return;
+                if (!input.value.toString().trim()) {
+                    allFilled = false;
+                    input.classList.add('border-rose-500', 'bg-rose-50');
+                    if (!firstEmptyInput) firstEmptyInput = input;
+                } else {
+                    input.classList.remove('border-rose-500', 'bg-rose-50');
+                }
+            });
+
+            if (!allFilled) {
+                if (firstEmptyInput) firstEmptyInput.focus();
+                showCustomAlert("حقول مطلوبة ⚠️", "يرجى تعبئة الحقول الإلزامية.", "warning");
+                return;
+            }
+
+            if (!document.getElementById('declaration-checkbox').checked) {
+                showCustomAlert("الإقرار مطلوب 📑", "يرجى الموافقة على الإقرار لتثبيت بصمتك.", "warning");
+                return;
+            }
+
+            const formData = new FormData(document.getElementById('modal-form'));
+            const rowData = {};
+            formData.forEach((v, k) => rowData[k] = v.toString().trim());
+
+            const headers = allSystemData[currentSheetName][0];
+            const isUpdate = document.getElementById('modal-title').innerText.includes("تعديل");
+
+            let idFieldName = headers.find(h => h.includes("هوية") || h.includes("الهوية") || h.includes("رقم الهوية"));
+            let husbandIdField = headers.find(h => h.includes("زوج") || h.includes("الزوج") || h.includes("هوية الزوج"));
+            let wifeIdField = headers.find(h => h.includes("زوجة") || h.includes("الزوجة") || h.includes("هوية الزوجة"));
+
+            const currentIdValue = idFieldName ? rowData[idFieldName] : null;
+            const currentHusbandId = husbandIdField ? rowData[husbandIdField] : null;
+            const currentWifeId = wifeIdField ? rowData[wifeIdField] : null;
+
+            const sheetData = allSystemData[currentSheetName] || [];
+
+            if (!isUpdate && sheetData.length > 1) {
+                for (let i = 1; i < sheetData.length; i++) {
+                    const row = sheetData[i];
+                    let checkId = idFieldName ? row[headers.indexOf(idFieldName)] : null;
+                    let checkHusband = husbandIdField ? row[headers.indexOf(husbandIdField)] : null;
+
+                    if (currentIdValue && checkId && currentIdValue === checkId.toString().trim()) {
+                        showCustomAlert("الهوية مسجلة مسبقاً ❌", `رقم الهوية [ ${currentIdValue} ] مكرر!`, "error");
+                        return;
+                    }
+                    if ((currentWifeId && checkHusband && currentWifeId === checkHusband.toString().trim()) || 
+                        (currentIdValue && checkHusband && currentIdValue === checkHusband.toString().trim()) ||
+                        (currentHusbandId && checkId && currentHusbandId === checkId.toString().trim())) {
+                        showCustomAlert("تنبيه أمني بالتكرار ⚠️", "موجود برقم الهوية للزوج وراجع المدير", "error");
+                        return;
+                    }
+                }
+            }
+
+            rowData["منظم السجل"] = currentUser ? currentUser.name : "آلي";
+            rowData["هوية المسؤول"] = currentUser ? currentUser.username : "000000000";
+            rowData["الإقرار القانوني"] = "تمت الموافقة والبصمة الرقمية مسجلة";
+
+            const saveBtn = document.getElementById('save-submit-btn');
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جاري البث...';
+
+            fetch(SCRIPT_URL, {
+                method: 'POST',
+                body: JSON.stringify({ action: isUpdate ? 'update' : 'insert', sheet: currentSheetName, id: activeEditId, rowData: rowData })
+            })
+            .then(res => res.json())
+            .then(res => {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> حفظ ومزامنة السجل';
+                if (res.status === 'success') {
+                    closeModal();
+                    fetchAllData();
+                    showCustomAlert("اكتمل الحفظ 📁", "تم مزامنة السجل وحفظه سحابياً بنجاح.", "success");
+                } else {
+                    showCustomAlert("فشلت المزامنة ❌", res.message, "error");
+                }
+            })
+            .catch(() => {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> حفظ ومزامنة السجل';
+                showCustomAlert("خطأ في الاتصال ❌", "فشل ترحيل الطلب للسيرفر السحابي.", "error");
+            });
+        }
+
+        function deleteRecord(id) {
+            if (currentUser && currentUser.role === "موظف" && currentSheetName === "admins") return;
+            if (!confirm("هل أنت متأكد قطعياً من حذف هذا السجل؟")) return;
+            
+            fetch(SCRIPT_URL, {
+                method: 'POST',
+                body: JSON.stringify({ action: 'delete', sheet: currentSheetName, id: id })
+            })
+            .then(res => res.json())
+            .then(res => {
+                if (res.status === 'success') {
+                    showCustomAlert("تم الحذف 🗑️", "تم حذف السجل بنجاح من قاعدة البيانات.", "success");
+                    fetchAllData();
+                }
+            });
+        }
+
+        function exportCurrentTable(format) {
+            const data = allSystemData[currentSheetName];
+            if (!data || data.length <= 1) {
+                showCustomAlert("كشف فارغ ⚠️", "لا توجد سجلات كافية للتصدير.", "warning");
+                return;
+            }
+            const filename = `كشف_${currentSheetName}_${new Date().toISOString().slice(0,10)}`;
+
+            if (format === 'excel') {
+                const worksheet = XLSX.utils.aoa_to_sheet(data);
+                const workbook = XLSX.utils.book_new();
+                Xcontent = XLSX.utils.book_append_sheet(workbook, worksheet, currentSheetName);
+                XLSX.writeFile(workbook, `${filename}.xlsx`);
+            } else if (format === 'pdf') {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+                doc.autoTable({ head: [data[0]], body: data.slice(1), styles: { font: 'Arial', halign: 'right' } });
+                doc.save(`${filename}.pdf`);
+            }
+            document.getElementById('export-dropdown').classList.add('hidden');
+        }
+
+        function downloadAllSheetsInOne() {
+            const sheetsList = ['families', 'children', 'students', 'certificates', 'injured', 'admins'];
+            const workbook = XLSX.utils.book_new();
+            let addedCount = 0;
+
+            sheetsList.forEach(sheetKey => {
+                if (currentUser && currentUser.role === "موظف" && sheetKey === "admins") return;
+                const sheetData = allSystemData[sheetKey];
+                if (sheetData && sheetData.length > 0) {
+                    const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
+                    XLSX.utils.book_append_sheet(workbook, worksheet, sheetKey);
+                    addedCount++;
+                }
+            });
+
+            if (addedCount > 0) {
+                XLSX.writeFile(workbook, `التقرير_الشامل_بيت_حانون_${new Date().toISOString().slice(0,10)}.xlsx`);
+                showCustomAlert("تم التنزيل الشامل 📊", "تم تجميع وتوليد التقرير الشامل بنجاح.", "success");
+            }
+        }
+
+        function closeModal() { document.getElementById('data-modal').classList.add('hidden'); }
+        function logout() { localStorage.removeItem('active_hanoun_user'); location.reload(); }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedUser = localStorage.getItem('active_hanoun_user');
+            if (savedUser) {
+                currentUser = JSON.parse(savedUser);
+                initDashboard();
+            }
+        });
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').then(reg => {
+                    console.log('PWA Service Worker Active!', reg.scope);
+                }).catch(err => {
+                    console.log('PWA Service Worker Error:', err);
+                });
+            });
+        }
+    </script>
+</body>
+</html>
